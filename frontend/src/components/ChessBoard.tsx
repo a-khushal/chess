@@ -2,7 +2,9 @@ import { Color, PieceSymbol, Square } from "chess.js"
 import { useState } from "react";
 import { MOVE } from "../pages/Game";
 
-export const ChessBoard = ({ board, socket }: { 
+export const ChessBoard = ({ board, socket }: {
+    chess: any,
+    setBoard: any, 
     board: ({
         square: Square; 
         type: PieceSymbol; 
@@ -17,18 +19,25 @@ export const ChessBoard = ({ board, socket }: {
         { board.map((row, i) => {
             return <div key={i} className="flex">
                 {row.map((square, j) => {
+                    const squareRepresentation = String.fromCharCode(97 + (j % 8)) + (8 - i) as Square;
                     return <div onClick={()=>{
                         if(!from){
-                            setFrom(square?.square ? square.square : null);
+                            setFrom(squareRepresentation);
                         } else {
-                            setTo(square?.square ? square.square : null);
                             socket.send(JSON.stringify({
                                 type: MOVE,
                                 payload: {
-                                    from,
-                                    to
+                                    move: {
+                                        from,
+                                        to: squareRepresentation
+                                    }
                                 }
                             }))
+                            setFrom(null);
+                            console.log({
+                                from,
+                                to: squareRepresentation
+                            })
                         }
                     }} key={j} className={`w-14 h-14 md:w-16 md:h-14 ${(i+j)%2 ? 'bg-green-900' : 'bg-green-200'}`}>
                             <div className="w-full flex justify-center items-center h-full">

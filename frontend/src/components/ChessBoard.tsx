@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Color, PieceSymbol, Square } from "chess.js"
 import { useState } from "react";
 import { MOVE } from "../pages/Game";
 
-export const ChessBoard = ({ board, socket }: {
+export const ChessBoard = ({ board, socket, chess, setBoard }: {
     chess: any,
     setBoard: any, 
     board: ({
@@ -13,13 +14,12 @@ export const ChessBoard = ({ board, socket }: {
     socket: WebSocket;
 }) => {
     const [from, setFrom] = useState<null | Square>(null);
-    const [to, setTo] = useState<null | Square>(null);
 
     return <div className="text-white">
         { board.map((row, i) => {
             return <div key={i} className="flex">
                 {row.map((square, j) => {
-                    const squareRepresentation = String.fromCharCode(97 + (j % 8)) + (8 - i) as Square;
+                    const squareRepresentation = String.fromCharCode(97 + (j % 8)) + "" + (8 - i) as Square;
                     return <div onClick={()=>{
                         if(!from){
                             setFrom(squareRepresentation);
@@ -34,6 +34,11 @@ export const ChessBoard = ({ board, socket }: {
                                 }
                             }))
                             setFrom(null);
+                            chess.move({
+                                from, 
+                                to: squareRepresentation,
+                            });
+                            setBoard(chess.board());
                             console.log({
                                 from,
                                 to: squareRepresentation

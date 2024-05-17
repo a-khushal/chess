@@ -10,6 +10,7 @@ export const GAME_OVER = 'game_over';
 
 export const Game = () => {
     const socket = useSocket();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [chess, setChess] = useState(new Chess());
     const [board, setBoard] = useState(chess.board());
 
@@ -21,7 +22,6 @@ export const Game = () => {
             const message = JSON.parse(event.data);
             switch(message.type){
                 case INIT_GAME: 
-                    setChess(new Chess())
                     setBoard(chess.board());
                     console.log("game initialized");
                     break;

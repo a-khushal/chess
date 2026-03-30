@@ -16,6 +16,7 @@ type ChessBoardSurfaceProps = {
   pgn: string;
   selectedSquare: string | null;
   selectedMoves: Move[];
+  engineBestMove: string | null;
   onSquareChoice: (square: string) => void;
   onPieceDrop: (args: PieceDropHandlerArgs) => boolean;
   onSourceSquareSelect: (square: string | null) => void;
@@ -26,35 +27,69 @@ export const ChessBoardSurface = ({
   pgn,
   selectedSquare,
   selectedMoves,
+  engineBestMove,
   onSquareChoice,
   onPieceDrop,
   onSourceSquareSelect,
 }: ChessBoardSurfaceProps) => {
-  const selectedPieceKey = useMemo(() => {
-    if (!selectedSquare) {
+  const engineHint = useMemo(() => {
+    if (selectedSquare || !engineBestMove) {
       return null;
     }
 
+    const match = engineBestMove.match(/^([a-h][1-8])([a-h][1-8])[qrbn]?$/);
+
+    if (!match) {
+      return null;
+    }
+
+    const from = match[1] as Square;
+    const to = match[2] as Square;
     const game = createGame(fen, pgn);
-    const piece = game.get(selectedSquare as Square);
+    const piece = game.get(from);
 
-    if (!piece) {
+    if (!piece || piece.color !== game.turn()) {
       return null;
     }
 
-    return `${piece.color}${piece.type.toUpperCase()}` as keyof typeof MONO_PIECES;
-  }, [selectedSquare, fen, pgn]);
+    return {
+      to,
+      pieceKey:
+        `${piece.color}${piece.type.toUpperCase()}` as keyof typeof MONO_PIECES,
+      isCapture: Boolean(game.get(to)),
+    };
+  }, [selectedSquare, engineBestMove, fen, pgn]);
+
+  const selectedPieceKey = useMemo(() => {
+    if (selectedSquare) {
+      const game = createGame(fen, pgn);
+      const piece = game.get(selectedSquare as Square);
+
+      if (!piece) {
+        return null;
+      }
+
+      return `${piece.color}${piece.type.toUpperCase()}` as keyof typeof MONO_PIECES;
+    }
+
+    return engineHint?.pieceKey ?? null;
+  }, [selectedSquare, fen, pgn, engineHint]);
 
   const recommendationBySquare = useMemo(() => {
     const map = new Map<string, boolean>();
-    const game = createGame(fen, pgn);
 
-    for (const move of selectedMoves) {
-      map.set(move.to, Boolean(game.get(move.to as Square)));
+    if (selectedSquare) {
+      const game = createGame(fen, pgn);
+
+      for (const move of selectedMoves) {
+        map.set(move.to, Boolean(game.get(move.to as Square)));
+      }
+    } else if (engineHint) {
+      map.set(engineHint.to, engineHint.isCapture);
     }
 
     return map;
-  }, [selectedMoves, fen, pgn]);
+  }, [selectedSquare, selectedMoves, fen, pgn, engineHint]);
 
   const ghostPieceRenderer = useMemo(() => {
     if (!selectedPieceKey) {

@@ -1,11 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
 import { ChessBoardSurface } from "../../components/chess/chess-board-surface";
+import { ChessEnginePanel } from "../../components/chess/chess-engine-panel";
 import { ChessGameDetails } from "../../components/chess/chess-game-details";
 import { ChessToolbar } from "../../components/chess/chess-toolbar";
+import { pvToSanLine, uciToSan } from "../../features/chess/game-utils";
 import { useChessController } from "../../features/chess/use-chess-controller";
+import { useStockfish } from "../../features/chess/use-stockfish";
+
+const formatEngineScore = (scoreType: "cp" | "mate", score: number) => {
+  if (scoreType === "mate") {
+    return `M${score > 0 ? "+" : ""}${score}`;
+  }
+
+  const pawns = (score / 100).toFixed(2);
+  return `${score >= 0 ? "+" : ""}${pawns}`;
+};
 
 export default function PlayPage() {
   const {
@@ -20,6 +33,25 @@ export default function PlayPage() {
     resetGame,
     loadSavedGame,
   } = useChessController();
+
+  const engine = useStockfish(view.fen);
+
+  const engineLines = useMemo(() => {
+    return engine.lines.map((line) => {
+      const firstMove = line.pv[0] ?? "";
+      const san = firstMove ? uciToSan(view.fen, view.pgn, firstMove) : "-";
+      const pvSan = pvToSanLine(view.fen, view.pgn, line.pv, 4).join(" ");
+
+      return {
+        san,
+        scoreText: formatEngineScore(line.scoreType, line.score),
+        depth: line.depth,
+        pvText: pvSan,
+      };
+    });
+  }, [engine.lines, view.fen, view.pgn]);
+
+  const engineBestMove = engine.lines[0]?.pv[0] ?? null;
 
   return (
     <main className="flex min-h-screen justify-center bg-[#c8c8c8] px-4 py-8 sm:py-12">
@@ -41,6 +73,7 @@ export default function PlayPage() {
           pgn={view.pgn}
           selectedSquare={selectedSquare}
           selectedMoves={selectedMoves}
+          engineBestMove={engineBestMove}
           onSquareChoice={handleSquareChoice}
           onPieceDrop={handlePieceDrop}
           onSourceSquareSelect={selectSourceSquare}
@@ -51,6 +84,13 @@ export default function PlayPage() {
           hasSavedGame={hasSavedGame}
           onReset={resetGame}
           onLoadSaved={loadSavedGame}
+        />
+
+        <ChessEnginePanel
+          ready={engine.ready}
+          thinking={engine.thinking}
+          error={engine.error}
+          lines={engineLines}
         />
 
         <ChessGameDetails

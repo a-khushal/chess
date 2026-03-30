@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 
 import type { GameView, SavedGame } from "./types";
 
@@ -74,4 +74,67 @@ export const parseSavedGame = (raw: string | null): SavedGame | null => {
   } catch {
     return null;
   }
+};
+
+const parseUciMove = (uci: string) => {
+  const match = uci.match(/^([a-h][1-8])([a-h][1-8])([qrbn])?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    from: match[1] as Square,
+    to: match[2] as Square,
+    promotion: match[3] as "q" | "r" | "b" | "n" | undefined,
+  };
+};
+
+export const uciToSan = (fen: string, pgn: string, uci: string) => {
+  const parsed = parseUciMove(uci);
+
+  if (!parsed) {
+    return uci;
+  }
+
+  const game = createGame(fen, pgn);
+
+  try {
+    const move = game.move(parsed);
+    return move?.san ?? uci;
+  } catch {
+    return uci;
+  }
+};
+
+export const pvToSanLine = (
+  fen: string,
+  pgn: string,
+  pv: string[],
+  limit = 4,
+) => {
+  const game = createGame(fen, pgn);
+  const sanMoves: string[] = [];
+
+  for (const uci of pv.slice(0, limit)) {
+    const parsed = parseUciMove(uci);
+
+    if (!parsed) {
+      break;
+    }
+
+    try {
+      const move = game.move(parsed);
+
+      if (!move) {
+        break;
+      }
+
+      sanMoves.push(move.san);
+    } catch {
+      break;
+    }
+  }
+
+  return sanMoves;
 };

@@ -15,3 +15,11 @@ export type GroupedMoveRow = {
   white: string;
   black: string | null;
 };
+
+export type EngineLine = {
+  multipv: number;
+  depth: number;
+  scoreType: "cp" | "mate";
+  score: number;
+  pv: string[];
+};

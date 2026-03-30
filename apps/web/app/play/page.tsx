@@ -1,16 +1,82 @@
 "use client";
 
-import { Chess } from "chess.js";
+import { Chess, type Move, type Square } from "chess.js";
 import Link from "next/link";
-import { Chessboard } from "react-chessboard";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Chessboard,
+  defaultPieces,
+  type PieceDropHandlerArgs,
+  type PieceRenderObject,
+} from "react-chessboard";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 const STORAGE_KEY = "chess-local-game-v1";
+const WHITE_FILL = "#f4f4f4";
+const BLACK_FILL = "#757575";
+
+const MONO_PIECES = {
+  wP: (props) => defaultPieces.wP!({ ...props, fill: WHITE_FILL }),
+  wR: (props) => defaultPieces.wR!({ ...props, fill: WHITE_FILL }),
+  wN: (props) => defaultPieces.wN!({ ...props, fill: WHITE_FILL }),
+  wB: (props) => defaultPieces.wB!({ ...props, fill: WHITE_FILL }),
+  wQ: (props) => defaultPieces.wQ!({ ...props, fill: WHITE_FILL }),
+  wK: (props) => defaultPieces.wK!({ ...props, fill: WHITE_FILL }),
+  bP: (props) => defaultPieces.bP!({ ...props, fill: BLACK_FILL }),
+  bR: (props) => defaultPieces.bR!({ ...props, fill: BLACK_FILL }),
+  bN: (props) => defaultPieces.bN!({ ...props, fill: BLACK_FILL }),
+  bB: (props) => defaultPieces.bB!({ ...props, fill: BLACK_FILL }),
+  bQ: (props) => defaultPieces.bQ!({ ...props, fill: BLACK_FILL }),
+  bK: (props) => defaultPieces.bK!({ ...props, fill: BLACK_FILL }),
+} satisfies PieceRenderObject;
 
 type SavedGame = {
   fen: string;
   pgn: string;
 };
+
+type GameView = {
+  fen: string;
+  pgn: string;
+  moves: string[];
+  status: string;
+};
+
+const getStatus = (game: Chess) => {
+  if (game.isCheckmate()) {
+    return game.turn() === "w"
+      ? "Checkmate - Black wins"
+      : "Checkmate - White wins";
+  }
+
+  if (game.isStalemate()) {
+    return "Stalemate";
+  }
+
+  if (game.isDraw()) {
+    return "Draw";
+  }
+
+  if (game.isCheck()) {
+    return game.turn() === "w"
+      ? "White to move - check"
+      : "Black to move - check";
+  }
+
+  return game.turn() === "w" ? "White to move" : "Black to move";
+};
+
+const toView = (game: Chess): GameView => ({
+  fen: game.fen(),
+  pgn: game.pgn(),
+  moves: game.history(),
+  status: getStatus(game),
+});
 
 const createGame = (fen: string, pgn: string) => {
   const game = new Chess();
@@ -54,53 +120,89 @@ const parseSavedGame = (raw: string | null): SavedGame | null => {
 };
 
 export default function PlayPage() {
-  const [fen, setFen] = useState(() => new Chess().fen());
-  const [pgn, setPgn] = useState("");
+  const gameRef = useRef(new Chess());
+  const [view, setView] = useState<GameView>(() => toView(gameRef.current));
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [hasSavedGame, setHasSavedGame] = useState(false);
-
-  const game = useMemo(() => createGame(fen, pgn), [fen, pgn]);
-
-  const moveHistory = useMemo(() => game.history(), [game]);
 
   const groupedMoves = useMemo(() => {
     const rows: Array<{ index: number; white: string; black: string | null }> =
       [];
 
-    for (let i = 0; i < moveHistory.length; i += 2) {
+    for (let i = 0; i < view.moves.length; i += 2) {
       rows.push({
         index: i / 2 + 1,
-        white: moveHistory[i] ?? "",
-        black: moveHistory[i + 1] ?? null,
+        white: view.moves[i] ?? "",
+        black: view.moves[i + 1] ?? null,
       });
     }
 
     return rows;
-  }, [moveHistory]);
+  }, [view.moves]);
 
-  const statusText = useMemo(() => {
-    if (game.isCheckmate()) {
-      return game.turn() === "w"
-        ? "Checkmate - Black wins"
-        : "Checkmate - White wins";
+  const selectedMoves = useMemo(() => {
+    if (!selectedSquare) {
+      return [] as Move[];
     }
 
-    if (game.isStalemate()) {
-      return "Stalemate";
+    try {
+      const game = createGame(view.fen, view.pgn);
+      return game.moves({
+        square: selectedSquare as Square,
+        verbose: true,
+      }) as Move[];
+    } catch {
+      return [] as Move[];
+    }
+  }, [selectedSquare, view.fen, view.pgn]);
+
+  const selectedPieceKey = (() => {
+    if (!selectedSquare) {
+      return null;
     }
 
-    if (game.isDraw()) {
-      return "Draw";
+    const piece = gameRef.current.get(selectedSquare as Square);
+
+    if (!piece) {
+      return null;
     }
 
-    if (game.isCheck()) {
-      return game.turn() === "w"
-        ? "White to move - check"
-        : "Black to move - check";
+    return `${piece.color}${piece.type.toUpperCase()}` as keyof typeof MONO_PIECES;
+  })();
+
+  const recommendationBySquare = useMemo(() => {
+    const map = new Map<string, Move>();
+
+    for (const move of selectedMoves) {
+      map.set(move.to, move);
     }
 
-    return game.turn() === "w" ? "White to move" : "Black to move";
-  }, [game]);
+    return map;
+  }, [selectedMoves]);
+
+  const ghostPieceRenderer = useMemo(() => {
+    if (!selectedPieceKey) {
+      return null;
+    }
+
+    return MONO_PIECES[selectedPieceKey];
+  }, [selectedPieceKey]);
+
+  const hintSquareStyles = useMemo(() => {
+    const styles: Record<string, CSSProperties> = {};
+
+    if (!selectedSquare) {
+      return styles;
+    }
+
+    styles[selectedSquare] = {
+      boxShadow: "inset 0 0 0 3px rgba(63,63,70,0.85)",
+      backgroundColor: "rgba(24,24,27,0.14)",
+    };
+
+    return styles;
+  }, [selectedSquare]);
 
   useEffect(() => {
     const saved = parseSavedGame(window.localStorage.getItem(STORAGE_KEY));
@@ -113,9 +215,15 @@ export default function PlayPage() {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ fen, pgn }));
-    setHasSavedGame(true);
-  }, [fen, pgn, readyToPersist]);
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ fen: view.fen, pgn: view.pgn }),
+    );
+
+    if (!hasSavedGame) {
+      setHasSavedGame(true);
+    }
+  }, [view.fen, view.pgn, readyToPersist, hasSavedGame]);
 
   const loadSavedGame = () => {
     const saved = parseSavedGame(window.localStorage.getItem(STORAGE_KEY));
@@ -126,123 +234,224 @@ export default function PlayPage() {
     }
 
     const restored = createGame(saved.fen, saved.pgn);
-    setFen(restored.fen());
-    setPgn(restored.pgn());
+    gameRef.current = restored;
+    setSelectedSquare(null);
+    setView(toView(restored));
   };
 
   const resetGame = () => {
     const fresh = new Chess();
-    setFen(fresh.fen());
-    setPgn("");
+    gameRef.current = fresh;
+    setSelectedSquare(null);
+    setView(toView(fresh));
   };
 
-  const handlePieceDrop = ({
-    sourceSquare,
-    targetSquare,
-  }: {
-    sourceSquare: string;
-    targetSquare: string | null;
-  }) => {
-    if (game.isGameOver()) {
+  const tryMove = (from: string, to: string) => {
+    if (gameRef.current.isGameOver()) {
       return false;
     }
-
-    if (!targetSquare) {
-      return false;
-    }
-
-    const nextGame = createGame(fen, pgn);
 
     try {
-      nextGame.move({
-        from: sourceSquare,
-        to: targetSquare,
+      gameRef.current.move({
+        from,
+        to,
         promotion: "q",
       });
-      setFen(nextGame.fen());
-      setPgn(nextGame.pgn());
+      setSelectedSquare(null);
+      setView(toView(gameRef.current));
       return true;
     } catch {
       return false;
     }
   };
 
+  const handleSquareChoice = (square: string) => {
+    const piece = gameRef.current.get(square as Square);
+    const sideToMove = gameRef.current.turn();
+
+    if (!selectedSquare) {
+      if (piece && piece.color === sideToMove) {
+        setSelectedSquare(square);
+      }
+      return;
+    }
+
+    if (selectedSquare === square) {
+      setSelectedSquare(null);
+      return;
+    }
+
+    const moved = tryMove(selectedSquare, square);
+
+    if (moved) {
+      return;
+    }
+
+    if (piece && piece.color === sideToMove) {
+      setSelectedSquare(square);
+    } else {
+      setSelectedSquare(null);
+    }
+  };
+
+  const selectSourcePiece = (square: string | null) => {
+    if (!square) {
+      return;
+    }
+
+    const piece = gameRef.current.get(square as Square);
+
+    if (piece && piece.color === gameRef.current.turn()) {
+      setSelectedSquare(square);
+    }
+  };
+
+  const handlePieceDrop = ({
+    sourceSquare,
+    targetSquare,
+  }: PieceDropHandlerArgs) => {
+    if (!targetSquare) {
+      return false;
+    }
+
+    return tryMove(sourceSquare, targetSquare);
+  };
+
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fffaf0_0%,_#f6f1e8_45%,_#ede3d2_100%)] px-4 py-6 sm:px-8 sm:py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
-              Local Chess
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold text-slate-900">
-              Play Board
-            </h1>
-          </div>
+    <main className="min-h-screen bg-[#c8c8c8] px-4 py-8 sm:py-12">
+      <div className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-5">
+        <div className="flex w-full max-w-[560px] items-center justify-between">
+          <h1 className="text-base font-semibold uppercase tracking-[0.22em] text-zinc-700">
+            Chess Board
+          </h1>
           <Link
             href="/"
-            className="rounded-xl border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-amber-50"
+            className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-zinc-700 transition hover:bg-zinc-200"
           >
             Home
           </Link>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="rounded-3xl border border-amber-200/80 bg-white p-4 shadow-[0_30px_70px_-45px_rgba(120,53,15,0.45)] sm:p-6">
-            <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-              {statusText}
-            </div>
+        <div className="w-full max-w-[560px] border border-zinc-700 bg-zinc-100 p-2 shadow-[0_28px_40px_-30px_rgba(0,0,0,0.7)] sm:p-3">
+          <Chessboard
+            options={{
+              position: view.fen,
+              onPieceDrop: handlePieceDrop,
+              onPieceClick: ({ square }) => {
+                selectSourcePiece(square);
+              },
+              onPieceDrag: ({ square }) => {
+                if (square) {
+                  selectSourcePiece(square);
+                }
+              },
+              onSquareClick: ({ square }) => handleSquareChoice(square),
+              pieces: MONO_PIECES,
+              squareStyles: hintSquareStyles,
+              squareRenderer: ({ square, children }) => {
+                const recommendation = recommendationBySquare.get(square);
+                const isCapture = Boolean(recommendation?.captured);
+                const GhostPiece = recommendation ? ghostPieceRenderer : null;
 
-            <div className="mx-auto w-full max-w-[560px]">
-              <Chessboard
-                options={{
-                  position: fen,
-                  onPieceDrop: handlePieceDrop,
-                  darkSquareStyle: { backgroundColor: "#b58863" },
-                  lightSquareStyle: { backgroundColor: "#f0d9b5" },
-                  boardStyle: {
-                    borderRadius: "14px",
-                    boxShadow: "0 22px 45px -32px rgba(120, 53, 15, 0.65)",
-                  },
-                }}
-              />
-            </div>
-          </section>
+                return (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      position: "relative",
+                    }}
+                  >
+                    <div style={isCapture ? { opacity: 0.45 } : undefined}>
+                      {children}
+                    </div>
+                    {GhostPiece && !isCapture ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: "10%",
+                          pointerEvents: "none",
+                          opacity: 0.48,
+                        }}
+                      >
+                        <GhostPiece
+                          square={square}
+                          svgStyle={{ opacity: 0.9 }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              },
+              darkSquareStyle: { backgroundColor: "#d1d1d1" },
+              lightSquareStyle: { backgroundColor: "#ececec" },
+              darkSquareNotationStyle: {
+                color: "#8d8d8d",
+                fontSize: "10px",
+                fontWeight: "500",
+              },
+              lightSquareNotationStyle: {
+                color: "#8d8d8d",
+                fontSize: "10px",
+                fontWeight: "500",
+              },
+              boardStyle: {
+                borderRadius: "0",
+                border: "2px solid #3f3f46",
+              },
+              animationDurationInMs: 60,
+              dragActivationDistance: 0,
+              allowDragOffBoard: true,
+              showNotation: true,
+            }}
+          />
+        </div>
 
-          <aside className="flex flex-col gap-4 rounded-3xl border border-amber-200/80 bg-white p-4 shadow-[0_22px_50px_-40px_rgba(120,53,15,0.45)]">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <button
-                type="button"
-                onClick={resetGame}
-                className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
-              >
-                New game
-              </button>
+        <p className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] text-zinc-600">
+          Click any piece to see legal recommendations on the board.
+        </p>
 
-              <button
-                type="button"
-                onClick={loadSavedGame}
-                disabled={!hasSavedGame}
-                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Load saved
-              </button>
-            </div>
+        <div className="flex w-full max-w-[560px] flex-wrap items-center justify-between gap-2 border border-zinc-400 bg-zinc-100 px-3 py-2 text-xs text-zinc-700">
+          <p className="font-medium uppercase tracking-[0.08em]">
+            {view.status}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetGame}
+              className="rounded border border-zinc-500 bg-white px-3 py-1 font-semibold uppercase tracking-[0.08em] transition hover:bg-zinc-200"
+            >
+              New game
+            </button>
+            <button
+              type="button"
+              onClick={loadSavedGame}
+              disabled={!hasSavedGame}
+              className="rounded border border-zinc-500 bg-white px-3 py-1 font-semibold uppercase tracking-[0.08em] transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Load saved
+            </button>
+          </div>
+        </div>
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+        <details className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100">
+          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-700">
+            Game details
+          </summary>
+          <div className="space-y-3 border-t border-zinc-300 px-3 py-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                 Move list
               </p>
               {groupedMoves.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-600">No moves yet.</p>
+                <p className="mt-2 text-xs text-zinc-600">No moves yet.</p>
               ) : (
-                <ol className="mt-3 max-h-72 space-y-1.5 overflow-auto text-sm text-slate-700">
+                <ol className="mt-2 max-h-44 space-y-1 overflow-auto text-xs text-zinc-700">
                   {groupedMoves.map((move) => (
                     <li
                       key={move.index}
                       className="grid grid-cols-[2rem_1fr_1fr] gap-2 font-mono"
                     >
-                      <span className="text-slate-500">{move.index}.</span>
+                      <span className="text-zinc-500">{move.index}.</span>
                       <span>{move.white}</span>
                       <span>{move.black ?? "-"}</span>
                     </li>
@@ -251,25 +460,25 @@ export default function PlayPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                 FEN
               </p>
-              <p className="mt-2 break-all font-mono text-[11px] text-slate-600">
-                {fen}
+              <p className="mt-1 break-all font-mono text-[11px] text-zinc-600">
+                {view.fen}
               </p>
             </div>
 
-            <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
                 PGN
               </p>
-              <p className="mt-2 max-h-24 overflow-auto font-mono text-[11px] text-slate-600">
-                {pgn || "No moves yet."}
+              <p className="mt-1 max-h-20 overflow-auto font-mono text-[11px] text-zinc-600">
+                {view.pgn || "No moves yet."}
               </p>
             </div>
-          </aside>
-        </div>
+          </div>
+        </details>
       </div>
     </main>
   );

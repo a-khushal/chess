@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { ChessBoardSurface } from "../../components/chess/chess-board-surface";
 import { ChessEnginePanel } from "../../components/chess/chess-engine-panel";
@@ -34,24 +34,35 @@ export default function PlayPage() {
     loadSavedGame,
   } = useChessController();
 
-  const engine = useStockfish(view.fen);
+  const [stockfishEnabled, setStockfishEnabled] = useState(true);
+
+  const engine = useStockfish(view.fen, stockfishEnabled);
 
   const engineLines = useMemo(() => {
-    return engine.lines.map((line) => {
-      const firstMove = line.pv[0] ?? "";
-      const san = firstMove ? uciToSan(view.fen, view.pgn, firstMove) : "-";
-      const pvSan = pvToSanLine(view.fen, view.pgn, line.pv, 4).join(" ");
+    if (!stockfishEnabled || !engine.ready) {
+      return [];
+    }
 
-      return {
-        san,
-        scoreText: formatEngineScore(line.scoreType, line.score),
-        depth: line.depth,
-        pvText: pvSan,
-      };
-    });
-  }, [engine.lines, view.fen, view.pgn]);
+    return engine.lines
+      .filter((line) => line.pv.length > 0)
+      .map((line) => {
+        const firstMove = line.pv[0];
+        const san = firstMove ? uciToSan(view.fen, view.pgn, firstMove) : "-";
+        const pvSan = pvToSanLine(view.fen, view.pgn, line.pv, 4).join(" ");
 
-  const engineBestMove = engine.lines[0]?.pv[0] ?? null;
+        return {
+          san,
+          scoreText: formatEngineScore(line.scoreType, line.score),
+          depth: line.depth,
+          pvText: pvSan,
+        };
+      });
+  }, [stockfishEnabled, engine.ready, engine.lines, view.fen, view.pgn]);
+
+  const engineBestMove =
+    stockfishEnabled && engine.ready
+      ? (engine.lines.find((line) => line.pv.length > 0)?.pv[0] ?? null)
+      : null;
 
   return (
     <main className="flex min-h-screen justify-center bg-[#c8c8c8] px-4 py-8 sm:py-12">
@@ -82,11 +93,14 @@ export default function PlayPage() {
         <ChessToolbar
           status={view.status}
           hasSavedGame={hasSavedGame}
+          stockfishEnabled={stockfishEnabled}
           onReset={resetGame}
           onLoadSaved={loadSavedGame}
+          onToggleStockfish={() => setStockfishEnabled((current) => !current)}
         />
 
         <ChessEnginePanel
+          enabled={stockfishEnabled}
           ready={engine.ready}
           thinking={engine.thinking}
           error={engine.error}

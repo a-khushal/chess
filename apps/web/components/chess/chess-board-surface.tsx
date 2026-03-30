@@ -5,7 +5,7 @@ import { useMemo, type CSSProperties } from "react";
 import {
   Chessboard,
   type PieceDropHandlerArgs,
-  type PieceHandlerArgs,
+  type SquareHandlerArgs,
 } from "react-chessboard";
 
 import { createGame } from "../../features/chess/game-utils";
@@ -32,6 +32,8 @@ export const ChessBoardSurface = ({
   onPieceDrop,
   onSourceSquareSelect,
 }: ChessBoardSurfaceProps) => {
+  const currentTurn = useMemo(() => createGame(fen, pgn).turn(), [fen, pgn]);
+
   const engineHint = useMemo(() => {
     if (selectedSquare || !engineBestMove) {
       return null;
@@ -112,8 +114,14 @@ export const ChessBoardSurface = ({
     } satisfies Record<string, CSSProperties>;
   }, [selectedSquare]);
 
-  const handlePieceDrag = ({ square }: PieceHandlerArgs) => {
-    onSourceSquareSelect(square);
+  const handleSquareMouseDown = ({ square, piece }: SquareHandlerArgs) => {
+    if (!piece) {
+      return;
+    }
+
+    if (piece.pieceType[0] === currentTurn) {
+      onSourceSquareSelect(square);
+    }
   };
 
   return (
@@ -122,7 +130,7 @@ export const ChessBoardSurface = ({
         options={{
           position: fen,
           onPieceDrop,
-          onPieceDrag: handlePieceDrag,
+          onSquareMouseDown: handleSquareMouseDown,
           onSquareClick: ({ square }) => onSquareChoice(square),
           pieces: MONO_PIECES,
           squareStyles: hintSquareStyles,

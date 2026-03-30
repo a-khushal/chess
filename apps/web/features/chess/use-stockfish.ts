@@ -54,7 +54,10 @@ type UseStockfishResult = {
   lines: EngineLine[];
 };
 
-export const useStockfish = (fen: string): UseStockfishResult => {
+export const useStockfish = (
+  fen: string,
+  enabled: boolean,
+): UseStockfishResult => {
   const workerRef = useRef<Worker | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lineMapRef = useRef<Map<number, EngineLine>>(new Map());
@@ -139,6 +142,18 @@ export const useStockfish = (fen: string): UseStockfishResult => {
       return;
     }
 
+    if (!enabled) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      worker.postMessage("stop");
+      lineMapRef.current.clear();
+      setLines([]);
+      setThinking(false);
+      return;
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -158,7 +173,7 @@ export const useStockfish = (fen: string): UseStockfishResult => {
         workerRef.current.postMessage("stop");
       }
     }, SEARCH_TIMEOUT_MS);
-  }, [fen, ready]);
+  }, [fen, ready, enabled]);
 
   return useMemo(
     () => ({

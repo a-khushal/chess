@@ -406,10 +406,6 @@ export default function PlayPage() {
           />
         </div>
 
-        <p className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-[10px] uppercase tracking-widest text-zinc-600">
-          Click any piece to see legal recommendations on the board.
-        </p>
-
         <div className="flex w-full max-w-[560px] flex-wrap items-center justify-between gap-2 border border-zinc-400 bg-zinc-100 px-3 py-2 text-xs text-zinc-700">
           <p className="font-medium uppercase tracking-[0.08em]">
             {view.status}

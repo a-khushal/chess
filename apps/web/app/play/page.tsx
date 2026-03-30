@@ -22,15 +22,15 @@ export default function PlayPage() {
   } = useChessController();
 
   return (
-    <main className="min-h-screen bg-[#c8c8c8] px-4 py-8 sm:py-12">
-      <div className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-5">
-        <div className="flex w-full max-w-[560px] items-center justify-between">
+    <main className="flex min-h-screen justify-center bg-[#c8c8c8] px-4 py-8 sm:py-12">
+      <div className="flex w-full max-w-[760px] flex-col items-center gap-5">
+        <div className="flex w-[min(560px,100%)] items-center justify-between">
           <h1 className="text-base font-semibold uppercase tracking-[0.22em] text-zinc-700">
             Chess Board
           </h1>
           <Link
             href="/"
-            className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-zinc-700 transition hover:bg-zinc-200"
+            className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-zinc-700 transition hover:bg-zinc-200"
           >
             Home
           </Link>
@@ -45,10 +45,6 @@ export default function PlayPage() {
           onPieceDrop={handlePieceDrop}
           onSourceSquareSelect={selectSourceSquare}
         />
-
-        <p className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] text-zinc-600">
-          Click any piece to preview legal moves, or drag to move.
-        </p>
 
         <ChessToolbar
           status={view.status}

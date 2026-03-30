@@ -46,14 +46,11 @@ export const ChessBoardSurface = ({
   }, [selectedSquare, fen, pgn]);
 
   const recommendationBySquare = useMemo(() => {
-    const map = new Map<string, { move: Move; isCapture: boolean }>();
+    const map = new Map<string, boolean>();
     const game = createGame(fen, pgn);
 
     for (const move of selectedMoves) {
-      map.set(move.to, {
-        move,
-        isCapture: Boolean(game.get(move.to as Square)),
-      });
+      map.set(move.to, Boolean(game.get(move.to as Square)));
     }
 
     return map;
@@ -85,7 +82,7 @@ export const ChessBoardSurface = ({
   };
 
   return (
-    <div className="w-full max-w-[560px] border border-zinc-700 bg-zinc-100 p-2 shadow-[0_28px_40px_-30px_rgba(0,0,0,0.7)] sm:p-3">
+    <div className="w-[min(560px,100%)] border border-zinc-700 bg-zinc-100 p-2 shadow-[0_28px_40px_-30px_rgba(0,0,0,0.7)] sm:p-3">
       <Chessboard
         options={{
           position: fen,
@@ -95,9 +92,10 @@ export const ChessBoardSurface = ({
           pieces: MONO_PIECES,
           squareStyles: hintSquareStyles,
           squareRenderer: ({ square, children }) => {
-            const recommendation = recommendationBySquare.get(square);
-            const isCapture = recommendation?.isCapture ?? false;
-            const GhostPiece = recommendation ? ghostPieceRenderer : null;
+            const isCapture = recommendationBySquare.get(square) ?? false;
+            const GhostPiece = recommendationBySquare.has(square)
+              ? ghostPieceRenderer
+              : null;
 
             return (
               <div

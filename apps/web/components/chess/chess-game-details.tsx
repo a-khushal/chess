@@ -12,7 +12,7 @@ export const ChessGameDetails = ({
   pgn,
 }: ChessGameDetailsProps) => {
   return (
-    <details className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100">
+    <details className="w-[min(560px,100%)] border border-zinc-400 bg-zinc-100">
       <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-700">
         Game details
       </summary>

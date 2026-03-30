@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-black px-6 py-16 text-slate-100">
+    <main className="min-h-screen bg-linear-to-b from-slate-900 via-slate-950 to-black px-6 py-16 text-slate-100">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-start gap-6">
         <p className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
           Local MVP

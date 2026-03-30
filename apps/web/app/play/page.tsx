@@ -326,7 +326,7 @@ export default function PlayPage() {
           </h1>
           <Link
             href="/"
-            className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-zinc-700 transition hover:bg-zinc-200"
+            className="rounded border border-zinc-500 bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-zinc-700 transition hover:bg-zinc-200"
           >
             Home
           </Link>
@@ -406,7 +406,7 @@ export default function PlayPage() {
           />
         </div>
 
-        <p className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] text-zinc-600">
+        <p className="w-full max-w-[560px] border border-zinc-400 bg-zinc-100 px-3 py-1.5 text-[10px] uppercase tracking-widest text-zinc-600">
           Click any piece to see legal recommendations on the board.
         </p>
 

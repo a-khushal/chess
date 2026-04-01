@@ -8,6 +8,10 @@ export type GameView = {
   pgn: string;
   moves: string[];
   status: string;
+  turn: "w" | "b";
+  lastMoveFrom: string | null;
+  lastMoveTo: string | null;
+  checkSquare: string | null;
 };
 
 export type GroupedMoveRow = {

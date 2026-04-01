@@ -61,10 +61,19 @@ export const useStockfish = (
   const workerRef = useRef<Worker | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lineMapRef = useRef<Map<number, EngineLine>>(new Map());
+  const activeSearchIdRef = useRef(0);
+  const pendingSearchIdRef = useRef(0);
   const [ready, setReady] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<EngineLine[]>([]);
+
+  const flushCurrentLines = () => {
+    const sorted = Array.from(lineMapRef.current.values())
+      .sort((a, b) => a.multipv - b.multipv)
+      .slice(0, MAX_MULTI_PV);
+    setLines(sorted);
+  };
 
   useEffect(() => {
     try {
@@ -87,6 +96,9 @@ export const useStockfish = (
         }
 
         if (text.startsWith("bestmove")) {
+          if (activeSearchIdRef.current === pendingSearchIdRef.current) {
+            flushCurrentLines();
+          }
           setThinking(false);
           return;
         }
@@ -101,14 +113,14 @@ export const useStockfish = (
           return;
         }
 
+        if (activeSearchIdRef.current !== pendingSearchIdRef.current) {
+          return;
+        }
+
         const existing = lineMapRef.current.get(parsed.multipv);
 
         if (!existing || parsed.depth >= existing.depth) {
           lineMapRef.current.set(parsed.multipv, parsed);
-          const sorted = Array.from(lineMapRef.current.values())
-            .sort((a, b) => a.multipv - b.multipv)
-            .slice(0, MAX_MULTI_PV);
-          setLines(sorted);
         }
       };
 
@@ -147,6 +159,7 @@ export const useStockfish = (
         clearTimeout(searchTimeoutRef.current);
       }
 
+      activeSearchIdRef.current += 1;
       worker.postMessage("stop");
       lineMapRef.current.clear();
       setLines([]);
@@ -162,6 +175,8 @@ export const useStockfish = (
     setLines([]);
     setThinking(true);
     setError(null);
+    pendingSearchIdRef.current += 1;
+    activeSearchIdRef.current = pendingSearchIdRef.current;
 
     worker.postMessage("stop");
     worker.postMessage(`setoption name MultiPV value ${MAX_MULTI_PV}`);

@@ -14,9 +14,13 @@ import { MONO_PIECES } from "../../features/chess/pieces";
 type ChessBoardSurfaceProps = {
   fen: string;
   pgn: string;
+  turn: "w" | "b";
   selectedSquare: string | null;
   selectedMoves: Move[];
   engineBestMove: string | null;
+  lastMoveFrom: string | null;
+  lastMoveTo: string | null;
+  checkSquare: string | null;
   onSquareChoice: (square: string) => void;
   onPieceDrop: (args: PieceDropHandlerArgs) => boolean;
   onSourceSquareSelect: (square: string | null) => void;
@@ -25,15 +29,17 @@ type ChessBoardSurfaceProps = {
 export const ChessBoardSurface = ({
   fen,
   pgn,
+  turn,
   selectedSquare,
   selectedMoves,
   engineBestMove,
+  lastMoveFrom,
+  lastMoveTo,
+  checkSquare,
   onSquareChoice,
   onPieceDrop,
   onSourceSquareSelect,
 }: ChessBoardSurfaceProps) => {
-  const currentTurn = useMemo(() => createGame(fen, pgn).turn(), [fen, pgn]);
-
   const engineHint = useMemo(() => {
     if (selectedSquare || !engineBestMove) {
       return null;
@@ -119,10 +125,38 @@ export const ChessBoardSurface = ({
       return;
     }
 
-    if (piece.pieceType[0] === currentTurn) {
+    if (piece.pieceType[0] === turn) {
       onSourceSquareSelect(square);
     }
   };
+
+  const mergedSquareStyles = useMemo(() => {
+    const styles: Record<string, CSSProperties> = { ...hintSquareStyles };
+
+    if (lastMoveFrom) {
+      styles[lastMoveFrom] = {
+        ...(styles[lastMoveFrom] ?? {}),
+        boxShadow: "inset 0 0 0 2px rgba(63,63,70,0.45)",
+      };
+    }
+
+    if (lastMoveTo) {
+      styles[lastMoveTo] = {
+        ...(styles[lastMoveTo] ?? {}),
+        backgroundColor: "rgba(113,113,122,0.22)",
+      };
+    }
+
+    if (checkSquare) {
+      styles[checkSquare] = {
+        ...(styles[checkSquare] ?? {}),
+        boxShadow:
+          "inset 0 0 0 3px rgba(127,29,29,0.9), inset 0 0 0 6px rgba(220,38,38,0.35)",
+      };
+    }
+
+    return styles;
+  }, [hintSquareStyles, lastMoveFrom, lastMoveTo, checkSquare]);
 
   return (
     <div className="w-[min(560px,100%)] border border-zinc-700 bg-zinc-100 p-2 shadow-[0_28px_40px_-30px_rgba(0,0,0,0.7)] sm:p-3">
@@ -133,7 +167,7 @@ export const ChessBoardSurface = ({
           onSquareMouseDown: handleSquareMouseDown,
           onSquareClick: ({ square }) => onSquareChoice(square),
           pieces: MONO_PIECES,
-          squareStyles: hintSquareStyles,
+          squareStyles: mergedSquareStyles,
           squareRenderer: ({ square, children }) => {
             const isCapture = recommendationBySquare.get(square) ?? false;
             const GhostPiece = recommendationBySquare.has(square)

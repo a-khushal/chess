@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ChessBoardSurface } from "../../components/chess/chess-board-surface";
 import { ChessEnginePanel } from "../../components/chess/chess-engine-panel";
+import { ChessEvalBar } from "../../components/chess/chess-eval-bar";
 import { ChessGameDetails } from "../../components/chess/chess-game-details";
 import { ChessToolbar } from "../../components/chess/chess-toolbar";
 import { pvToSanLine, uciToSan } from "../../features/chess/game-utils";
 import { useChessController } from "../../features/chess/use-chess-controller";
 import { useStockfish } from "../../features/chess/use-stockfish";
+
+const STOCKFISH_TOGGLE_KEY = "chess-stockfish-enabled";
 
 const formatEngineScore = (scoreType: "cp" | "mate", score: number) => {
   if (scoreType === "mate") {
@@ -35,6 +38,21 @@ export default function PlayPage() {
   } = useChessController();
 
   const [stockfishEnabled, setStockfishEnabled] = useState(true);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(STOCKFISH_TOGGLE_KEY);
+
+    if (saved === "false") {
+      setStockfishEnabled(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      STOCKFISH_TOGGLE_KEY,
+      stockfishEnabled ? "true" : "false",
+    );
+  }, [stockfishEnabled]);
 
   const engine = useStockfish(view.fen, stockfishEnabled);
 
@@ -64,6 +82,11 @@ export default function PlayPage() {
       ? (engine.lines.find((line) => line.pv.length > 0)?.pv[0] ?? null)
       : null;
 
+  const topEngineLine =
+    stockfishEnabled && engine.ready
+      ? (engine.lines.find((line) => line.pv.length > 0) ?? null)
+      : null;
+
   return (
     <main className="flex min-h-screen justify-center bg-[#c8c8c8] px-4 py-8 sm:py-12">
       <div className="flex w-full max-w-[760px] flex-col items-center gap-5">
@@ -79,16 +102,46 @@ export default function PlayPage() {
           </Link>
         </div>
 
-        <ChessBoardSurface
-          fen={view.fen}
-          pgn={view.pgn}
-          selectedSquare={selectedSquare}
-          selectedMoves={selectedMoves}
-          engineBestMove={engineBestMove}
-          onSquareChoice={handleSquareChoice}
-          onPieceDrop={handlePieceDrop}
-          onSourceSquareSelect={selectSourceSquare}
-        />
+        <div className="flex w-[min(620px,100%)] items-stretch justify-center gap-3">
+          <ChessBoardSurface
+            fen={view.fen}
+            pgn={view.pgn}
+            turn={view.turn}
+            selectedSquare={selectedSquare}
+            selectedMoves={selectedMoves}
+            engineBestMove={engineBestMove}
+            lastMoveFrom={view.lastMoveFrom}
+            lastMoveTo={view.lastMoveTo}
+            checkSquare={view.checkSquare}
+            onSquareChoice={handleSquareChoice}
+            onPieceDrop={handlePieceDrop}
+            onSourceSquareSelect={selectSourceSquare}
+          />
+
+          {topEngineLine ? (
+            <div className="hidden md:flex">
+              <ChessEvalBar
+                enabled={stockfishEnabled}
+                turn={view.turn}
+                scoreType={topEngineLine.scoreType}
+                score={topEngineLine.score}
+                orientation="vertical"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {topEngineLine ? (
+          <div className="md:hidden">
+            <ChessEvalBar
+              enabled={stockfishEnabled}
+              turn={view.turn}
+              scoreType={topEngineLine.scoreType}
+              score={topEngineLine.score}
+              orientation="horizontal"
+            />
+          </div>
+        ) : null}
 
         <ChessToolbar
           status={view.status}

@@ -1,4 +1,4 @@
-import { Chess, type Square } from "chess.js";
+import { Chess, type Color, type Square } from "chess.js";
 
 import type { GameView, SavedGame } from "./types";
 
@@ -28,12 +28,35 @@ export const getStatus = (game: Chess) => {
   return game.turn() === "w" ? "White to move" : "Black to move";
 };
 
-export const toView = (game: Chess): GameView => ({
-  fen: game.fen(),
-  pgn: game.pgn(),
-  moves: game.history(),
-  status: getStatus(game),
-});
+const getKingSquare = (game: Chess, color: Color) => {
+  const board = game.board();
+
+  for (const row of board) {
+    for (const piece of row) {
+      if (piece && piece.color === color && piece.type === "k") {
+        return piece.square;
+      }
+    }
+  }
+
+  return null;
+};
+
+export const toView = (game: Chess): GameView => {
+  const history = game.history({ verbose: true });
+  const lastMove = history[history.length - 1] ?? null;
+
+  return {
+    fen: game.fen(),
+    pgn: game.pgn(),
+    moves: history.map((move) => move.san),
+    status: getStatus(game),
+    turn: game.turn(),
+    lastMoveFrom: lastMove?.from ?? null,
+    lastMoveTo: lastMove?.to ?? null,
+    checkSquare: game.isCheck() ? getKingSquare(game, game.turn()) : null,
+  };
+};
 
 export const createGame = (fen: string, pgn: string) => {
   const game = new Chess();
